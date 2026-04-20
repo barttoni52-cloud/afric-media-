@@ -1,4 +1,9 @@
-import { supabase } from '../../lib/supabase';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
 
 export async function POST(request) {
   const { subject, intro, articleIds, adminKey } = await request.json();
@@ -11,13 +16,16 @@ export async function POST(request) {
       model: 'llama3-70b-8192', max_tokens: 2000,
       messages: [
         { role: 'system', content: 'Tu crées des newsletters HTML pour A-FRIC. Tu réponds UNIQUEMENT avec le HTML complet.' },
-        { role: 'user', content: `Newsletter HTML : intro="${intro || 'Voici vos actualités africaines.'}", articles:\n${(articles||[]).map((a,i)=>`${i+1}. ${a.title} (${a.cat}): ${a.content.substring(0,200)}`).join('\n')}\nStyle: fond blanc, vert #1a6b3a, max-width 600px, footer "A-FRIC · Médias africains francophones"` }
+        { role: 'user', content: `Newsletter HTML: intro="${intro || 'Voici vos actualités africaines.'}"\nArticles:\n${(articles||[]).map((a,i)=>`${i+1}. ${a.title}: ${a.content.substring(0,200)}`).join('\n')}\nStyle: fond blanc, vert #1a6b3a, max-width 600px` }
       ]
     })
   });
   const aiData = await res.json();
   const htmlContent = aiData.choices?.[0]?.message?.content || '';
-  const { data: newsletter } = await supabase.from('newsletters').insert([{ subject: subject || 'A-FRIC Newsletter', html_content: htmlContent, article_ids: articleIds || [], created_at: new Date().toISOString(), sent: false }]).select();
+  const { data: newsletter } = await supabase.from('newsletters').insert([{
+    subject: subject || 'A-FRIC Newsletter', html_content: htmlContent,
+    article_ids: articleIds || [], created_at: new Date().toISOString(), sent: false
+  }]).select();
   return Response.json({ success: true, newsletter: newsletter?.[0] });
 }
 
