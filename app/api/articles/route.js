@@ -1,5 +1,9 @@
-// afric-media v2
-import { supabase } from '../../lib/supabase';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -24,7 +28,9 @@ export async function POST(request) {
 
 export async function PUT(request) {
   const { id, ...fields } = await request.json();
-  const { data, error } = await supabase.from('articles').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', id).select();
+  const { data, error } = await supabase.from('articles')
+    .update({ ...fields, updated_at: new Date().toISOString() })
+    .eq('id', id).select();
   if (error) return Response.json({ error: error.message }, { status: 500 });
   return Response.json(data[0]);
 }
