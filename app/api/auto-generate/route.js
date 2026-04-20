@@ -1,4 +1,9 @@
-import { supabase } from '../../lib/supabase';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
 
 const THEMES = [
   'innovations technologiques africaines 2025',
@@ -21,9 +26,7 @@ export async function GET() {
 
 export async function POST(request) {
   const { adminKey, themeIndex } = await request.json();
-  if (adminKey !== process.env.NEXT_PUBLIC_ADMIN_PASSWORD) {
-    return Response.json({ error: 'Non autorisé' }, { status: 401 });
-  }
+  if (adminKey !== process.env.NEXT_PUBLIC_ADMIN_PASSWORD) return Response.json({ error: 'Non autorisé' }, { status: 401 });
   const theme = themeIndex !== undefined ? THEMES[themeIndex % THEMES.length] : THEMES[Math.floor(Math.random() * THEMES.length)];
 
   const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -32,8 +35,8 @@ export async function POST(request) {
     body: JSON.stringify({
       model: 'llama3-70b-8192', max_tokens: 3000,
       messages: [
-        { role: 'system', content: 'Tu es éditeur pour A-FRIC, média africain francophone. Tu génères des articles positifs et inspirants. Tu réponds UNIQUEMENT avec du JSON valide sans markdown.' },
-        { role: 'user', content: `Génère 3 articles sur : "${theme}". JSON: [{"title":"titre max 90 chars","cat":"Technologie|Économie|Agriculture|Culture|Sport|Santé|Éducation|Environnement|Diaspora|Politique","source":"RFI Afrique|Jeune Afrique|Le Monde Afrique|BBC Afrique|The Africa Report","content":"350 mots min, positif, factuel, inspirant, 3-4 paragraphes, français"}]` }
+        { role: 'system', content: 'Tu es éditeur pour A-FRIC. Tu réponds UNIQUEMENT avec du JSON valide sans markdown.' },
+        { role: 'user', content: `Génère 3 articles sur : "${theme}". JSON: [{"title":"titre max 90 chars","cat":"Technologie|Économie|Agriculture|Culture|Sport|Santé|Éducation|Environnement|Diaspora|Politique","source":"RFI Afrique|Jeune Afrique|Le Monde Afrique|BBC Afrique|The Africa Report","content":"350 mots, positif, français, 3-4 paragraphes"}]` }
       ]
     })
   });
