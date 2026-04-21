@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
-import Groq from 'groq-sdk';
 import { createClient } from '@supabase/supabase-js';
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -20,6 +18,32 @@ const THEMES = [
   { label: '🌿 Environnement', topic: "les initiatives africaines de protection de l'environnement et d'énergie verte", category: "Environnement" },
   { label: '🗳️ Politique & Démocratie', topic: "les avancées démocratiques et la bonne gouvernance en Afrique", category: "Politique" },
 ];
+
+async function callGroq(topic, category) {
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      max_tokens: 4000,
+      messages: [
+        {
+          role: 'system',
+          content: `Tu es un journaliste senior pour A-FRIC, un média africain francophone destiné à la diaspora africaine en Europe. Tu rédiges des articles informatifs, positifs, inspirants et bénéfiques pour l'Afrique et sa diaspora. Tu dois générer EXACTEMENT 3 articles différents sur le thème donné. Réponds UNIQUEMENT en JSON valide, sans aucun texte avant ou après, avec ce format exact : {"articles": [{"title": "...", "content": "...", "cat": "..."}, {"title": "...", "content": "...", "cat": "..."}, {"title": "...", "content": "...", "cat": "..."}]}`,
+        },
+        {
+          role: 'user',
+          content: `Génère 3 articles sur le thème : "${topic}". Catégorie principale : ${category}. Chaque article doit faire au moins 400 mots, être factuel et valoriser l'Afrique.`,
+        },
+      ],
+    }),
+  });
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content ?? '{}';
+}
 
 async function fetchUnsplashImage(query) {
   try {
@@ -45,31 +69,12 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
   }
 
-  const idx = themeIndex !== undefined && themeIndex !== null
+  const idx = (themeIndex !== undefined && themeIndex !== null)
     ? themeIndex
     : Math.floor(Math.random() * THEMES.length);
   const theme = THEMES[idx] || THEMES[0];
 
-  const completion = await groq.chat.completions.create({
-    model: 'llama-3.3-70b-versatile',
-    messages: [
-      {
-        role: 'system',
-        content: `Tu es un journaliste senior pour A-FRIC, un média africain francophone destiné à la diaspora africaine en Europe.
-Tu rédiges des articles informatifs, positifs, inspirants et bénéfiques pour l'Afrique et sa diaspora.
-Tu dois générer EXACTEMENT 3 articles différents sur le thème donné.
-Réponds UNIQUEMENT en JSON valide, sans aucun texte avant ou après, avec ce format exact :
-{"articles": [{"title": "...", "content": "...", "cat": "..."}, {"title": "...", "content": "...", "cat": "..."}, {"title": "...", "content": "...", "cat": "..."}]}`,
-      },
-      {
-        role: 'user',
-        content: `Génère 3 articles sur le thème : "${theme.topic}". Catégorie principale : ${theme.category}. Chaque article doit faire au moins 400 mots, être factuel et valoriser l'Afrique.`,
-      },
-    ],
-    max_tokens: 4000,
-  });
-
-  const raw = completion.choices[0].message.content ?? '{}';
+  const raw = await callGroq(theme.topic, theme.category);
   const clean = raw.replace(/```json|```/g, '').trim();
 
   let parsed;
@@ -83,9 +88,7 @@ Réponds UNIQUEMENT en JSON valide, sans aucun texte avant ou après, avec ce fo
   let saved = 0;
 
   for (const art of articlesData) {
-    const imageQuery = `${art.title} Africa`;
-    const image_url = await fetchUnsplashImage(imageQuery);
-
+    const image_url = await fetchUnsplashImage(`${art.title} Africa`);
     const { error } = await supabase.from('articles').insert([{
       title: art.title,
       content: art.content,
@@ -96,7 +99,6 @@ Réponds UNIQUEMENT en JSON valide, sans aucun texte avant ou après, avec ce fo
       type: 'auto',
       created_at: new Date().toISOString(),
     }]);
-
     if (!error) saved++;
   }
 
