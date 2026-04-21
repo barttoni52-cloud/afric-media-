@@ -21,9 +21,35 @@ const IMGS = {
 const img = (a) => a.image_url || IMGS[a.cat] || IMGS.default;
 const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
 
+function ShareRow({ article }) {
+  const url = encodeURIComponent(`https://afric-media.vercel.app/article/${article.id}`);
+  const txt = encodeURIComponent(article.title);
+  return (
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 24 }}>
+      <span style={{ fontSize: 12, color: '#999', alignSelf: 'center' }}>Partager :</span>
+      {[
+        ['Facebook', `https://www.facebook.com/sharer/sharer.php?u=${url}`, '#1877f2'],
+        ['WhatsApp', `https://wa.me/?text=${txt}%20${url}`, '#25d366'],
+        ['X', `https://twitter.com/intent/tweet?text=${txt}&url=${url}`, '#000'],
+        ['LinkedIn', `https://www.linkedin.com/sharing/share-offsite/?url=${url}`, '#0077b5'],
+      ].map(([label, href, bg]) => (
+        <a key={label} href={href} target="_blank" rel="noreferrer"
+          style={{ padding: '5px 14px', borderRadius: 20, background: bg, color: '#fff', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>
+          {label}
+        </a>
+      ))}
+      <button onClick={() => { navigator.clipboard.writeText(`https://afric-media.vercel.app/article/${article.id}`); alert('Lien copié !'); }}
+        style={{ padding: '5px 14px', borderRadius: 20, background: '#eee', color: '#555', fontSize: 12, border: 'none', cursor: 'pointer' }}>
+        Copier
+      </button>
+    </div>
+  );
+}
+
 export default function Home() {
   const [articles, setArticles] = useState([]);
   const [filter, setFilter] = useState('Tous');
+  const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
@@ -46,6 +72,32 @@ export default function Home() {
     setNlMsg(d.message || d.error || 'Inscription réussie !');
     if (d.success || d.message) { setEmail(''); setName(''); }
   };
+
+  if (selected) return (
+    <div style={{ minHeight: '100vh', background: '#faf8f4' }}>
+      <nav style={N}>
+        <div style={LOGO}>A<span style={{ color: '#c8991a' }}>-</span>FRIC</div>
+        <div style={{ flex: 1 }} />
+        <Link href="/admin" style={ABTN}>Admin</Link>
+      </nav>
+      <div style={{ maxWidth: 720, margin: '0 auto', padding: '2rem 1.5rem' }}>
+        <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', color: '#1a6b3a', cursor: 'pointer', fontSize: 13, padding: 0, marginBottom: 24, display: 'block' }}>← Tous les articles</button>
+        <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 2, color: '#1a6b3a', fontWeight: 700, marginBottom: 8 }}>{selected.cat}</div>
+        <h1 style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.25, marginBottom: 12, fontFamily: 'Georgia,serif', color: '#111' }}>{selected.title}</h1>
+        <div style={{ fontSize: 13, color: '#999', marginBottom: 24, paddingBottom: 16, borderBottom: '1px solid #eee' }}>
+          {selected.source} · {fmtDate(selected.created_at)}
+        </div>
+        <img src={img(selected)} alt="" style={{ width: '100%', height: 300, objectFit: 'cover', borderRadius: 10, marginBottom: 24 }} />
+        <div style={{ fontSize: 16, lineHeight: 1.85, color: '#222' }}>
+          {selected.content.split('\n').filter(l => l.trim()).map((p, i) => <p key={i} style={{ marginBottom: 16 }}>{p}</p>)}
+        </div>
+        <ShareRow article={selected} />
+        <div style={{ marginTop: 24, padding: '12px 16px', background: '#f0faf4', borderRadius: 8, fontSize: 12, color: '#777' }}>
+          Source : {selected.source} · A-FRIC Médias africains francophones
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div style={{ minHeight: '100vh', background: '#faf8f4' }}>
@@ -72,39 +124,33 @@ export default function Home() {
 
         {!loading && filtered.length > 0 && (
           <>
-            {/* Article hero */}
-            <Link href={`/article/${filtered[0].id}`} style={{ textDecoration: 'none' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', background: '#fff', borderRadius: 12, border: '1px solid #eee', overflow: 'hidden', marginBottom: 20, cursor: 'pointer' }}>
-                <img src={img(filtered[0])} alt="" style={{ width: '100%', height: '100%', minHeight: 260, objectFit: 'cover' }} />
-                <div style={{ padding: '2rem' }}>
-                  <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 2, color: '#1a6b3a', fontWeight: 700, marginBottom: 8 }}>{filtered[0].cat}</div>
-                  <h2 style={{ fontSize: 20, fontWeight: 700, fontFamily: 'Georgia,serif', lineHeight: 1.3, marginBottom: 10, color: '#111' }}>{filtered[0].title}</h2>
-                  <div style={{ fontSize: 12, color: '#999', marginBottom: 12 }}>{filtered[0].source} · {fmtDate(filtered[0].created_at)}</div>
-                  <p style={{ fontSize: 14, color: '#555', lineHeight: 1.7 }}>{filtered[0].content.substring(0, 180)}…</p>
-                  <span style={{ display: 'inline-block', marginTop: 12, fontSize: 13, color: '#1a6b3a', fontWeight: 600 }}>Lire →</span>
-                </div>
+            <div onClick={() => setSelected(filtered[0])} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', background: '#fff', borderRadius: 12, border: '1px solid #eee', overflow: 'hidden', marginBottom: 20, cursor: 'pointer' }}>
+              <img src={img(filtered[0])} alt="" style={{ width: '100%', height: '100%', minHeight: 260, objectFit: 'cover' }} />
+              <div style={{ padding: '2rem' }}>
+                <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 2, color: '#1a6b3a', fontWeight: 700, marginBottom: 8 }}>{filtered[0].cat}</div>
+                <h2 style={{ fontSize: 20, fontWeight: 700, fontFamily: 'Georgia,serif', lineHeight: 1.3, marginBottom: 10, color: '#111' }}>{filtered[0].title}</h2>
+                <div style={{ fontSize: 12, color: '#999', marginBottom: 12 }}>{filtered[0].source} · {fmtDate(filtered[0].created_at)}</div>
+                <p style={{ fontSize: 14, color: '#555', lineHeight: 1.7 }}>{filtered[0].content.substring(0, 180)}…</p>
+                <span style={{ display: 'inline-block', marginTop: 12, fontSize: 13, color: '#1a6b3a', fontWeight: 600 }}>Lire →</span>
               </div>
-            </Link>
+            </div>
 
             <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 2, color: '#ccc', marginBottom: 12 }}>Derniers articles</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 12, marginBottom: 40 }}>
               {filtered.slice(1).map(a => (
-                <Link key={a.id} href={`/article/${a.id}`} style={{ textDecoration: 'none' }}>
-                  <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 10, overflow: 'hidden', cursor: 'pointer', height: '100%' }}>
-                    <img src={img(a)} alt="" style={{ width: '100%', height: 150, objectFit: 'cover' }} />
-                    <div style={{ padding: '1rem' }}>
-                      <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.5, color: '#1a6b3a', fontWeight: 700, marginBottom: 6 }}>{a.cat}</div>
-                      <h3 style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.4, marginBottom: 6, fontFamily: 'Georgia,serif', color: '#111' }}>{a.title}</h3>
-                      <div style={{ fontSize: 11, color: '#bbb' }}>{a.source} · {fmtDate(a.created_at)}</div>
-                    </div>
+                <div key={a.id} onClick={() => setSelected(a)} style={{ background: '#fff', border: '1px solid #eee', borderRadius: 10, overflow: 'hidden', cursor: 'pointer' }}>
+                  <img src={img(a)} alt="" style={{ width: '100%', height: 150, objectFit: 'cover' }} />
+                  <div style={{ padding: '1rem' }}>
+                    <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.5, color: '#1a6b3a', fontWeight: 700, marginBottom: 6 }}>{a.cat}</div>
+                    <h3 style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.4, marginBottom: 6, fontFamily: 'Georgia,serif', color: '#111' }}>{a.title}</h3>
+                    <div style={{ fontSize: 11, color: '#bbb' }}>{a.source} · {fmtDate(a.created_at)}</div>
                   </div>
-                </Link>
+                </div>
               ))}
             </div>
           </>
         )}
 
-        {/* Newsletter */}
         <div style={{ background: '#1a6b3a', borderRadius: 14, padding: '2.5rem 2rem', color: '#fff', textAlign: 'center', marginBottom: 32 }}>
           <div style={{ fontSize: 10, letterSpacing: 3, textTransform: 'uppercase', opacity: .6, marginBottom: 8 }}>Newsletter gratuite</div>
           <h2 style={{ fontSize: 22, fontWeight: 700, fontFamily: 'Georgia,serif', marginBottom: 8 }}>L'Afrique dans votre boîte mail</h2>
