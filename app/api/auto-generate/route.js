@@ -1,11 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
 const THEMES = [
   { label: '🌱 Agriculture & Innovation', topic: "les innovations agricoles en Afrique et leur impact sur la sécurité alimentaire", category: "Agriculture" },
   { label: '💰 Économie & Croissance', topic: "la croissance économique africaine et les opportunités pour la diaspora", category: "Économie" },
@@ -32,7 +27,7 @@ async function callGroq(topic, category) {
       messages: [
         {
           role: 'system',
-          content: `Tu es un journaliste senior pour A-FRIC, un média africain francophone destiné à la diaspora africaine en Europe. Tu rédiges des articles informatifs, positifs, inspirants et bénéfiques pour l'Afrique et sa diaspora. Tu dois générer EXACTEMENT 3 articles différents sur le thème donné. Réponds UNIQUEMENT en JSON valide, sans aucun texte avant ou après, avec ce format exact : {"articles": [{"title": "...", "content": "...", "cat": "..."}, {"title": "...", "content": "...", "cat": "..."}, {"title": "...", "content": "...", "cat": "..."}]}`,
+          content: `Tu es un journaliste senior pour A-FRIC, un média africain francophone destiné à la diaspora africaine en Europe. Tu rédiges des articles informatifs, positifs, inspirants et bénéfiques pour l'Afrique et sa diaspora. Tu dois générer EXACTEMENT 3 articles différents sur le thème donné. Réponds UNIQUEMENT en JSON valide, sans aucun texte avant ou après, avec ce format exact : {"articles": [{"title": "...", "content": "...", "cat": "..."}, {"title": "...", "content": "...", "cat": "..."}]}`,
         },
         {
           role: 'user',
@@ -63,6 +58,12 @@ export async function GET() {
 }
 
 export async function POST(req) {
+  // ✅ createClient ici, pas au niveau global
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  );
+
   const { adminKey, themeIndex } = await req.json();
 
   if (adminKey !== process.env.ADMIN_PASSWORD) {
@@ -81,7 +82,7 @@ export async function POST(req) {
   try {
     parsed = JSON.parse(clean);
   } catch {
-    return NextResponse.json({ error: 'Erreur parsing JSON Groq', raw: clean }, { status: 500 });
+    return NextResponse.json({ error: 'Erreur parsing JSON', raw: clean }, { status: 500 });
   }
 
   const articlesData = parsed.articles || [];
