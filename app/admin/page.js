@@ -15,7 +15,7 @@ export default function Admin() {
   const [eTitle, setETitle] = useState('');
   const [eCat, setECat] = useState('Technologie');
   const [eSource, setESource] = useState('');
-  const [eContent, setEContent] = useState('');
+const eContentRef = useRef(null);
   const [aiStatus, setAiStatus] = useState('');
   const [generating, setGenerating] = useState(false);
   const [genMsg, setGenMsg] = useState('');
@@ -236,7 +236,7 @@ else showToast('Erreur : ' + (d.error || 'contenu vide'));
               <div><label style={S.lbl}>Source</label><input value={eSource} onChange={e => setESource(e.target.value)} placeholder="RFI Afrique..." style={S.inp} /></div>
             </div>
             <label style={S.lbl}>Contenu *</label>
-            <textarea value={eContent} onChange={e => setEContent(e.target.value)} placeholder="Rédigez ici ou cliquez sur ✦ Aide IA..." style={{ ...S.inp, minHeight: 220, resize: 'vertical' }} />
+            <textarea ref={eContentRef} defaultValue={eContent} onChange={e => setEContent(e.target.value)}
             {aiStatus && <div style={{ fontSize: 13, color: '#888', marginBottom: 12 }}>{aiStatus}</div>}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button onClick={() => saveManual('published')} style={S.btnG}>Publier</button>
