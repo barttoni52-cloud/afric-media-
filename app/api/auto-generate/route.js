@@ -1,56 +1,68 @@
+import { NextResponse } from 'next/server';
+import Groq from 'groq-sdk';
 import { createClient } from '@supabase/supabase-js';
 
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const THEMES = [
-  'innovations technologiques africaines 2025',
-  'startups africaines qui révolutionnent leur secteur',
-  'avancées scientifiques en Afrique',
-  'entrepreneurs africains qui changent le monde',
-  'agriculture intelligente et food tech en Afrique',
-  'énergie solaire et transition énergétique Afrique',
-  'fintech et inclusion financière en Afrique',
-  'diaspora africaine en Europe : succès et initiatives',
-  'culture africaine rayonnant sur le monde',
-  'santé et médecine : percées africaines',
-  'éducation et jeunesse africaine innovante',
-  'sport africain : champions et compétitions',
-];
-
-export async function GET() {
-  return Response.json({ themes: THEMES });
+async function fetchUnsplashImage(query: string): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=1&orientation=landscape`,
+      { headers: { Authorization: `Client-ID ${process.env.UNSPLASH_ACCESS_KEY}` } }
+    );
+    const data = await res.json();
+    return data?.results?.[0]?.urls?.regular ?? null;
+  } catch {
+    return null;
+  }
 }
 
-export async function POST(request) {
-  const { adminKey, themeIndex } = await request.json();
-  if (adminKey !== process.env.NEXT_PUBLIC_ADMIN_PASSWORD) return Response.json({ error: 'Non autorisé' }, { status: 401 });
-  const theme = themeIndex !== undefined ? THEMES[themeIndex % THEMES.length] : THEMES[Math.floor(Math.random() * THEMES.length)];
+export async function POST(req: Request) {
+  const { topic, category } = await req.json();
 
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` },
-    body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile', max_tokens: 3000,
-      messages: [
-        { role: 'system', content: 'Tu es éditeur pour A-FRIC. Tu réponds UNIQUEMENT avec du JSON valide sans markdown.' },
-        { role: 'user', content: `Génère 3 articles sur : "${theme}". JSON: [{"title":"titre max 90 chars","cat":"Technologie|Économie|Agriculture|Culture|Sport|Santé|Éducation|Environnement|Diaspora|Politique","source":"RFI Afrique|Jeune Afrique|Le Monde Afrique|BBC Afrique|The Africa Report","content":"350 mots, positif, français, 3-4 paragraphes"}]` }
-      ]
-    })
+  // 1. Génération du contenu avec Groq
+  const completion = await groq.chat.completions.create({
+    model: 'llama-3.3-70b-versatile',
+    messages: [
+      {
+        role: 'system',
+        content: `Tu es un journaliste pour A-FRIC, un média africain francophone destiné à la diaspora africaine en Europe. 
+Rédige un article informatif, positif et bénéfique pour l'Afrique et sa diaspora.
+Réponds UNIQUEMENT en JSON valide avec les champs: title, content, excerpt, category.`,
+      },
+      {
+        role: 'user',
+        content: `Écris un article sur: ${topic}. Catégorie: ${category || 'Actualités'}.`,
+      },
+    ],
+    max_tokens: 2000,
   });
 
-  const data = await res.json();
-  const text = data.choices?.[0]?.message?.content || '[]';
-  let articles;
-  try { articles = JSON.parse(text.replace(/```json|```/g, '').trim()); }
-  catch { return Response.json({ error: 'Parsing échoué' }, { status: 500 }); }
+  const raw = completion.choices[0].message.content ?? '{}';
+  const clean = raw.replace(/```json|```/g, '').trim();
+  const article = JSON.parse(clean);
 
-  const { data: saved, error } = await supabase.from('articles').insert(
-    articles.map(a => ({ title: a.title, cat: a.cat, source: a.source, content: a.content, status: 'draft', type: 'auto', created_at: new Date().toISOString() }))
-  ).select();
+  // 2. Recherche image Unsplash basée sur le titre
+  const imageQuery = `${article.title} Africa`;
+  const image_url = await fetchUnsplashImage(imageQuery);
 
-  if (error) return Response.json({ error: error.message }, { status: 500 });
-  return Response.json({ success: true, theme, count: saved.length, articles: saved });
+  // 3. Sauvegarde en base (statut 'draft' pour validation)
+  const { data, error } = await supabase.from('articles').insert([
+    {
+      title: article.title,
+      content: article.content,
+      excerpt: article.excerpt,
+      category: article.category || category,
+      image_url,
+      status: 'draft',
+      created_at: new Date().toISOString(),
+    },
+  ]).select().single();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ success: true, article: data });
 }
