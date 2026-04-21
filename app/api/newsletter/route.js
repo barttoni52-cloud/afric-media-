@@ -13,7 +13,7 @@ export async function POST(request) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` },
     body: JSON.stringify({
-      model: 'llama3-8b-8192', max_tokens: 2000,
+      model: 'llama-3.3-70b-versatile', max_tokens: 2000,
       messages: [
         { role: 'system', content: 'Tu crées des newsletters HTML pour A-FRIC. Tu réponds UNIQUEMENT avec le HTML complet.' },
         { role: 'user', content: `Newsletter HTML: intro="${intro || 'Voici vos actualités africaines.'}"\nArticles:\n${(articles||[]).map((a,i)=>`${i+1}. ${a.title}: ${a.content.substring(0,200)}`).join('\n')}\nStyle: fond blanc, vert #1a6b3a, max-width 600px` }
