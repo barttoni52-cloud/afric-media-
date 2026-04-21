@@ -4,7 +4,7 @@ export async function POST(request) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` },
     body: JSON.stringify({
-      model: 'llama3-8b-8192', max_tokens: 2500,
+      model: 'llama-3.3-70b-versatile', max_tokens: 2500,
       messages: [
         { role: 'system', content: 'Tu es éditeur pour A-FRIC. Tu réponds UNIQUEMENT avec du JSON valide, sans markdown.' },
         { role: 'user', content: `Génère 3 articles sur : "${query}". JSON: [{"title":"...","cat":"Technologie|Économie|Agriculture|Culture|Sport|Santé|Éducation|Environnement|Diaspora|Politique","source":"RFI Afrique|Jeune Afrique|Le Monde Afrique|BBC Afrique","content":"280 mots positif pro-Afrique français"}]` }
