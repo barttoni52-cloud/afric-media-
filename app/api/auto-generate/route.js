@@ -4,8 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
 const THEMES = [
@@ -21,8 +21,7 @@ const THEMES = [
   { label: '🗳️ Politique & Démocratie', topic: "les avancées démocratiques et la bonne gouvernance en Afrique", category: "Politique" },
 ];
 
-// ── Cherche une image Unsplash ────────────────────────────────────────────────
-async function fetchUnsplashImage(query: string): Promise<string | null> {
+async function fetchUnsplashImage(query) {
   try {
     const res = await fetch(
       `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=1&orientation=landscape`,
@@ -35,27 +34,22 @@ async function fetchUnsplashImage(query: string): Promise<string | null> {
   }
 }
 
-// ── GET : retourne la liste des thèmes pour l'admin ───────────────────────────
 export async function GET() {
   return NextResponse.json({ themes: THEMES.map(t => t.label) });
 }
 
-// ── POST : génère des articles avec Groq + image Unsplash ─────────────────────
-export async function POST(req: Request) {
+export async function POST(req) {
   const { adminKey, themeIndex } = await req.json();
 
-  // Vérification mot de passe admin
   if (adminKey !== process.env.ADMIN_PASSWORD) {
     return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
   }
 
-  // Sélection du thème (aléatoire si non précisé)
   const idx = themeIndex !== undefined && themeIndex !== null
     ? themeIndex
     : Math.floor(Math.random() * THEMES.length);
   const theme = THEMES[idx] || THEMES[0];
 
-  // Génération de 3 articles avec Groq
   const completion = await groq.chat.completions.create({
     model: 'llama-3.3-70b-versatile',
     messages: [
@@ -78,7 +72,7 @@ Réponds UNIQUEMENT en JSON valide, sans aucun texte avant ou après, avec ce fo
   const raw = completion.choices[0].message.content ?? '{}';
   const clean = raw.replace(/```json|```/g, '').trim();
 
-  let parsed: { articles: { title: string; content: string; cat: string }[] };
+  let parsed;
   try {
     parsed = JSON.parse(clean);
   } catch {
@@ -89,7 +83,6 @@ Réponds UNIQUEMENT en JSON valide, sans aucun texte avant ou après, avec ce fo
   let saved = 0;
 
   for (const art of articlesData) {
-    // Recherche image Unsplash basée sur le titre
     const imageQuery = `${art.title} Africa`;
     const image_url = await fetchUnsplashImage(imageQuery);
 
@@ -98,7 +91,7 @@ Réponds UNIQUEMENT en JSON valide, sans aucun texte avant ou après, avec ce fo
       content: art.content,
       cat: art.cat || theme.category,
       source: 'A-FRIC IA',
-      image_url,          // ← image automatique
+      image_url,
       status: 'draft',
       type: 'auto',
       created_at: new Date().toISOString(),
@@ -107,9 +100,5 @@ Réponds UNIQUEMENT en JSON valide, sans aucun texte avant ou après, avec ce fo
     if (!error) saved++;
   }
 
-  return NextResponse.json({
-    success: true,
-    count: saved,
-    theme: theme.label,
-  });
+  return NextResponse.json({ success: true, count: saved, theme: theme.label });
 }
