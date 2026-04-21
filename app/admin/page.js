@@ -318,7 +318,7 @@ else showToast('Erreur : ' + (d.error || 'contenu vide'));
 
 const S = {
   lbl: { fontSize: 11, color: '#aaa', textTransform: 'uppercase', letterSpacing: .5, marginBottom: 4, display: 'block' },
-  inp: { width: '100%', padding: '9px 12px', border: '1px solid #eee', borderRadius: 7, fontSize: 14, marginBottom: 12, fontFamily: 'inherit', boxSizing: 'border-box', outline: 'none' },
+ inp: { width: '100%', padding: '9px 12px', border: '1px solid #eee', borderRadius: 7, fontSize: 14, marginBottom: 12, fontFamily: 'inherit', boxSizing: 'border-box', outline: 'none', color: '#111', background: '#fff' },
   btnG: { padding: '9px 20px', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, border: 'none', background: '#1a6b3a', color: '#fff' },
   btnO: { padding: '9px 20px', borderRadius: 7, cursor: 'pointer', fontSize: 13, border: '1px solid #eee', background: 'transparent', color: '#555' },
   smBtn: { padding: '5px 12px', fontSize: 12, borderRadius: 6, cursor: 'pointer', border: '1px solid #eee', background: 'transparent', color: '#555' },
