@@ -2,19 +2,153 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 const THEMES = [
-  { label: '🌱 Agriculture & Innovation', topic: "les innovations agricoles en Afrique et leur impact sur la sécurité alimentaire", category: "Agriculture" },
-  { label: '💰 Économie & Croissance', topic: "la croissance économique africaine et les opportunités pour la diaspora", category: "Économie" },
-  { label: '🎓 Éducation & Jeunesse', topic: "les initiatives éducatives transformant la jeunesse africaine", category: "Éducation" },
-  { label: '💻 Tech & Startups', topic: "les startups technologiques africaines qui révolutionnent le continent", category: "Technologie" },
-  { label: '🌍 Diaspora & Europe', topic: "l'impact positif de la diaspora africaine en Europe sur le développement du continent", category: "Diaspora" },
-  { label: '🏥 Santé & Bien-être', topic: "les avancées médicales et sanitaires en Afrique", category: "Santé" },
-  { label: '🎭 Culture & Arts', topic: "le rayonnement de la culture africaine en Europe et dans le monde", category: "Culture" },
-  { label: '⚽ Sport & Fierté', topic: "les succès sportifs africains sur la scène internationale", category: "Sport" },
-  { label: '🌿 Environnement', topic: "les initiatives africaines de protection de l'environnement et d'énergie verte", category: "Environnement" },
-  { label: '🗳️ Politique & Démocratie', topic: "les avancées démocratiques et la bonne gouvernance en Afrique", category: "Politique" },
+  {
+    label: '🌱 Agriculture & Innovation',
+    topic: "les innovations agricoles en Afrique et leur impact sur la sécurité alimentaire",
+    category: "Agriculture",
+    rss: [
+      "https://www.rfi.fr/fr/afrique/rss",
+      "https://www.theafricareport.com/feed/",
+      "https://www.agenceecofin.com/rss",
+      "https://gabonmediatime.com/cat/actualites/economie/feed/",
+    ]
+  },
+  {
+    label: '💰 Économie & Croissance',
+    topic: "la croissance économique africaine et les opportunités pour la diaspora",
+    category: "Économie",
+    rss: [
+      "https://www.agenceecofin.com/rss",
+      "https://www.theafricareport.com/feed/",
+      "https://businesstech.co.za/news/feed/",
+      "https://www.rfi.fr/fr/afrique/rss",
+      "https://gabonmediatime.com/cat/actualites/economie/feed/",
+      "https://www.lunion.fr/rss",
+    ]
+  },
+  {
+    label: '🎓 Éducation & Jeunesse',
+    topic: "les initiatives éducatives transformant la jeunesse africaine",
+    category: "Éducation",
+    rss: [
+      "https://www.rfi.fr/fr/afrique/rss",
+      "https://www.theafricareport.com/feed/",
+      "https://www.bbc.com/afrique/rss.xml",
+      "https://gabonmediatime.com/feed/",
+    ]
+  },
+  {
+    label: '💻 Tech & Startups',
+    topic: "les startups technologiques africaines qui révolutionnent le continent",
+    category: "Technologie",
+    rss: [
+      "https://techcrunch.com/tag/africa/feed/",
+      "https://www.theafricareport.com/feed/",
+      "https://businesstech.co.za/news/feed/",
+      "https://www.agenceecofin.com/rss",
+      "https://gabonmediatime.com/feed/",
+    ]
+  },
+  {
+    label: '🌍 Diaspora & Europe',
+    topic: "l'impact positif de la diaspora africaine en Europe sur le développement du continent",
+    category: "Diaspora",
+    rss: [
+      "https://www.rfi.fr/fr/afrique/rss",
+      "https://www.lemonde.fr/afrique/rss_full.xml",
+      "https://www.bbc.com/afrique/rss.xml",
+      "https://gabonmediatime.com/feed/",
+    ]
+  },
+  {
+    label: '🏥 Santé & Bien-être',
+    topic: "les avancées médicales et sanitaires en Afrique",
+    category: "Santé",
+    rss: [
+      "https://www.rfi.fr/fr/afrique/rss",
+      "https://www.theafricareport.com/feed/",
+      "https://www.bbc.com/afrique/rss.xml",
+      "https://gabonmediatime.com/feed/",
+    ]
+  },
+  {
+    label: '🎭 Culture & Arts',
+    topic: "le rayonnement de la culture africaine en Europe et dans le monde",
+    category: "Culture",
+    rss: [
+      "https://www.rfi.fr/fr/culture/rss",
+      "https://www.jeuneafrique.com/feed/",
+      "https://www.theafricareport.com/feed/",
+      "https://gabonmediatime.com/feed/",
+    ]
+  },
+  {
+    label: '⚽ Sport & Fierté',
+    topic: "les succès sportifs africains sur la scène internationale",
+    category: "Sport",
+    rss: [
+      "https://www.rfi.fr/fr/sports/rss",
+      "https://www.bbc.com/afrique/rss.xml",
+      "https://businesstech.co.za/news/feed/",
+      "https://gabonmediatime.com/feed/",
+    ]
+  },
+  {
+    label: '🌿 Environnement',
+    topic: "les initiatives africaines de protection de l'environnement et d'énergie verte",
+    category: "Environnement",
+    rss: [
+      "https://www.rfi.fr/fr/afrique/rss",
+      "https://www.theafricareport.com/feed/",
+      "https://www.lemonde.fr/afrique/rss_full.xml",
+      "https://gabonmediatime.com/cat/actualites/economie/feed/",
+    ]
+  },
+  {
+    label: '🗳️ Politique & Démocratie',
+    topic: "les avancées démocratiques et la bonne gouvernance en Afrique",
+    category: "Politique",
+    rss: [
+      "https://www.rfi.fr/fr/afrique/rss",
+      "https://www.bbc.com/afrique/rss.xml",
+      "https://www.jeuneafrique.com/feed/",
+      "https://www.theafricareport.com/feed/",
+      "https://gabonmediatime.com/cat/actualites/politique/feed/",
+      "https://www.lunion.fr/rss",
+    ]
+  },
 ];
 
-async function callGroq(topic, category) {
+// ── Cherche les vraies actualités via plusieurs flux RSS ─────────────────────
+async function fetchRealNews(rssUrls) {
+  const allHeadlines = [];
+
+  for (const rssUrl of rssUrls) {
+    try {
+      const res = await fetch(
+        `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&count=3`,
+        { signal: AbortSignal.timeout(5000) }
+      );
+      const data = await res.json();
+      if (data.items && data.items.length > 0) {
+        data.items.slice(0, 3).forEach(item => {
+          const desc = item.description?.replace(/<[^>]*>/g, '').substring(0, 120) || '';
+          allHeadlines.push(`- ${item.title}${desc ? ': ' + desc : ''}`);
+        });
+      }
+    } catch {
+      // Source indisponible, on continue avec les autres
+    }
+  }
+
+  return allHeadlines.length > 0 ? allHeadlines.join('\n') : null;
+}
+
+async function callGroq(topic, category, realNews) {
+  const newsContext = realNews
+    ? `\n\nVoici des actualités récentes (francophones, anglophones et gabonaises) pour t'inspirer. Ne les copie pas, rédige des articles originaux en français :\n${realNews}`
+    : '';
+
   const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -27,11 +161,11 @@ async function callGroq(topic, category) {
       messages: [
         {
           role: 'system',
-          content: `Tu es un journaliste senior pour A-FRIC, un média africain francophone destiné à la diaspora africaine en Europe. Tu rédiges des articles informatifs, positifs, inspirants et bénéfiques pour l'Afrique et sa diaspora. Tu dois générer EXACTEMENT 3 articles différents sur le thème donné. Réponds UNIQUEMENT en JSON valide, sans aucun texte avant ou après, avec ce format exact : {"articles": [{"title": "...", "content": "...", "cat": "..."}, {"title": "...", "content": "...", "cat": "..."}]}`,
+          content: `Tu es un journaliste senior pour A-FRIC, un média africain francophone destiné à la diaspora africaine en Europe. Tu rédiges des articles informatifs, positifs, inspirants et bénéfiques pour l'Afrique et sa diaspora. Inspire-toi des vraies actualités récentes si elles sont fournies, mais rédige toujours en français et de manière originale. Tu dois générer EXACTEMENT 3 articles différents. Réponds UNIQUEMENT en JSON valide, sans aucun texte avant ou après, avec ce format exact : {"articles": [{"title": "...", "content": "...", "cat": "..."}, {"title": "...", "content": "...", "cat": "..."}, {"title": "...", "content": "...", "cat": "..."}]}`,
         },
         {
           role: 'user',
-          content: `Génère 3 articles sur le thème : "${topic}". Catégorie principale : ${category}. Chaque article doit faire au moins 400 mots, être factuel et valoriser l'Afrique.`,
+          content: `Génère 3 articles sur le thème : "${topic}". Catégorie principale : ${category}. Chaque article doit faire au moins 400 mots, être factuel et valoriser l'Afrique.${newsContext}`,
         },
       ],
     }),
@@ -58,7 +192,6 @@ export async function GET() {
 }
 
 export async function POST(req) {
-  // ✅ createClient ici, pas au niveau global
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -75,7 +208,8 @@ export async function POST(req) {
     : Math.floor(Math.random() * THEMES.length);
   const theme = THEMES[idx] || THEMES[0];
 
-  const raw = await callGroq(theme.topic, theme.category);
+  const realNews = await fetchRealNews(theme.rss);
+  const raw = await callGroq(theme.topic, theme.category, realNews);
   const clean = raw.replace(/```json|```/g, '').trim();
 
   let parsed;
@@ -103,5 +237,5 @@ export async function POST(req) {
     if (!error) saved++;
   }
 
-  return NextResponse.json({ success: true, count: saved, theme: theme.label });
+  return NextResponse.json({ success: true, count: saved, theme: theme.label, newsFound: !!realNews });
 }
