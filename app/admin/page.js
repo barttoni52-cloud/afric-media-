@@ -16,6 +16,9 @@ export default function Admin() {
   const [eCat, setECat] = useState('Technologie');
   const [eSource, setESource] = useState('');
   const [eContent, setEContent] = useState('');
+  const [eImageUrl, setEImageUrl] = useState('');         // ← NOUVEAU
+  const [eImagePreview, setEImagePreview] = useState(''); // ← NOUVEAU
+  const [imgLoading, setImgLoading] = useState(false);    // ← NOUVEAU
   const [contentKey, setContentKey] = useState(0);
   const [aiLoading, setAiLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -89,10 +92,41 @@ export default function Admin() {
     showToast('Supprimé');
   };
 
+  // ── NOUVEAU : recherche image Unsplash ──────────────────────────────────────
+  const searchUnsplash = async (title, setUrl, setPreview) => {
+    if (!title.trim()) { showToast('Entrez un titre d\'abord'); return; }
+    setImgLoading(true);
+    try {
+      const query = encodeURIComponent(title + ' Africa');
+      const res = await fetch(
+        `https://api.unsplash.com/search/photos?query=${query}&per_page=1&orientation=landscape`,
+        { headers: { Authorization: `Client-ID ${process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY}` } }
+      );
+      const data = await res.json();
+      const url = data?.results?.[0]?.urls?.regular;
+      if (url) { setUrl(url); setPreview(url); showToast('✓ Image trouvée !'); }
+      else showToast('Aucune image trouvée, essayez une URL manuelle');
+    } catch { showToast('Erreur lors de la recherche Unsplash'); }
+    setImgLoading(false);
+  };
+  // ────────────────────────────────────────────────────────────────────────────
+
   const saveManual = async (status) => {
     if (!eTitle.trim() || !eContent.trim()) { showToast('Titre et contenu requis'); return; }
-    await fetch('/api/articles', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: eTitle, cat: eCat, source: eSource || 'A-FRIC Rédaction', content: eContent, status }) });
-    setETitle(''); setECat('Technologie'); setESource(''); setEContent(''); setContentKey(k => k + 1);
+    await fetch('/api/articles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: eTitle, cat: eCat,
+        source: eSource || 'A-FRIC Rédaction',
+        content: eContent,
+        image_url: eImageUrl || null, // ← NOUVEAU
+        status
+      })
+    });
+    setETitle(''); setECat('Technologie'); setESource('');
+    setEContent(''); setEImageUrl(''); setEImagePreview(''); // ← NOUVEAU
+    setContentKey(k => k + 1);
     load(adminPw);
     showToast(status === 'published' ? '✓ Publié !' : '✓ Brouillon enregistré');
   };
@@ -121,7 +155,11 @@ export default function Admin() {
   };
 
   const saveEdit = async (status) => {
-    await fetch('/api/articles', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...editArt, status }) });
+    await fetch('/api/articles', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...editArt, status }) // image_url déjà dans editArt
+    });
     setEditArt(null);
     load(adminPw);
     showToast('✓ Mis à jour !');
@@ -188,6 +226,10 @@ export default function Admin() {
               </div>
             ) : pending.map(a => (
               <div key={a.id} style={{ background: '#fff', border: '1px solid #eee', borderRadius: 10, padding: '1.25rem', marginBottom: 10 }}>
+                {/* ── NOUVEAU : miniature image si disponible ── */}
+                {a.image_url && (
+                  <img src={a.image_url} alt="" style={{ width: '100%', height: 140, objectFit: 'cover', borderRadius: 7, marginBottom: 10 }} />
+                )}
                 <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.5, color: '#1a6b3a', fontWeight: 700, marginBottom: 4 }}>{a.cat}</div>
                 <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6, color: '#111' }}>{a.title}</div>
                 <div style={{ fontSize: 12, color: '#aaa', marginBottom: 10 }}>{a.source} · {fmtDate(a.created_at)} {a.type === 'auto' ? '· 🤖' : '· ✏️'}</div>
@@ -207,6 +249,8 @@ export default function Admin() {
             {published.length === 0 && <div style={{ textAlign: 'center', padding: '3rem', color: '#bbb' }}>Aucun article publié.</div>}
             {published.map(a => (
               <div key={a.id} style={{ background: '#fff', border: '1px solid #eee', borderRadius: 10, padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: 12 }}>
+                {/* ── NOUVEAU : vignette ── */}
+                {a.image_url && <img src={a.image_url} alt="" style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />}
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 3, color: '#111' }}>{a.title}</div>
                   <div style={{ fontSize: 12, color: '#aaa' }}>{a.cat} · {a.source} · {fmtDate(a.created_at)}</div>
@@ -248,6 +292,33 @@ export default function Admin() {
               <div><label style={S.lbl}>Catégorie</label><select value={eCat} onChange={e => setECat(e.target.value)} style={S.inp}>{CATS.map(c => <option key={c}>{c}</option>)}</select></div>
               <div><label style={S.lbl}>Source</label><input value={eSource} onChange={e => setESource(e.target.value)} placeholder="RFI Afrique..." style={S.inp} /></div>
             </div>
+
+            {/* ── NOUVEAU : bloc image ──────────────────────────────────────── */}
+            <label style={S.lbl}>Image de l'article</label>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+              <input
+                value={eImageUrl}
+                onChange={e => { setEImageUrl(e.target.value); setEImagePreview(e.target.value); }}
+                placeholder="Coller une URL d'image (optionnel)..."
+                style={{ ...S.inp, marginBottom: 0, flex: 1 }}
+              />
+              <button
+                type="button"
+                onClick={() => searchUnsplash(eTitle, setEImageUrl, setEImagePreview)}
+                disabled={imgLoading}
+                style={{ ...S.btnO, whiteSpace: 'nowrap', background: imgLoading ? '#f5f5f5' : '#fff' }}
+              >
+                {imgLoading ? '⏳' : '🔍 Unsplash'}
+              </button>
+            </div>
+            {eImagePreview && (
+              <div style={{ marginBottom: 16, position: 'relative' }}>
+                <img src={eImagePreview} alt="preview" style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 8 }} />
+                <button onClick={() => { setEImageUrl(''); setEImagePreview(''); }} style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,.5)', color: '#fff', border: 'none', borderRadius: 4, padding: '3px 8px', fontSize: 12, cursor: 'pointer' }}>✕</button>
+              </div>
+            )}
+            {/* ──────────────────────────────────────────────────────────────── */}
+
             <label style={S.lbl}>Contenu * {eContent.length > 0 && <span style={{ color: '#1a6b3a' }}>({eContent.length} caractères)</span>}</label>
             <textarea
               key={contentKey}
@@ -262,7 +333,7 @@ export default function Admin() {
               <button onClick={aiWrite} disabled={aiLoading} style={{ ...S.btnO, background: aiLoading ? '#999' : '#2a1a6b', color: '#fff', borderColor: '#2a1a6b', cursor: aiLoading ? 'wait' : 'pointer' }}>
                 {aiLoading ? '⏳ Génération...' : '✦ Aide IA'}
               </button>
-              <button onClick={() => { setETitle(''); setEContent(''); setESource(''); setContentKey(k => k + 1); }} style={S.btnO}>Effacer</button>
+              <button onClick={() => { setETitle(''); setEContent(''); setESource(''); setEImageUrl(''); setEImagePreview(''); setContentKey(k => k + 1); }} style={S.btnO}>Effacer</button>
             </div>
           </div>
         )}
@@ -311,6 +382,7 @@ export default function Admin() {
         )}
       </div>
 
+      {/* ── Modal modifier article ─────────────────────────────────────────── */}
       {editArt && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 200, padding: '2rem', overflowY: 'auto' }}>
           <div style={{ background: '#fff', borderRadius: 14, padding: '2rem', width: '100%', maxWidth: 660 }}>
@@ -320,6 +392,37 @@ export default function Admin() {
               <div><label style={S.lbl}>Catégorie</label><select value={editArt.cat} onChange={e => setEditArt({ ...editArt, cat: e.target.value })} style={S.inp}>{CATS.map(c => <option key={c}>{c}</option>)}</select></div>
               <div><label style={S.lbl}>Source</label><input value={editArt.source} onChange={e => setEditArt({ ...editArt, source: e.target.value })} style={S.inp} /></div>
             </div>
+
+            {/* ── NOUVEAU : image dans la modal ── */}
+            <label style={S.lbl}>Image de l'article</label>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+              <input
+                value={editArt.image_url || ''}
+                onChange={e => setEditArt({ ...editArt, image_url: e.target.value })}
+                placeholder="URL de l'image..."
+                style={{ ...S.inp, marginBottom: 0, flex: 1 }}
+              />
+              <button
+                type="button"
+                onClick={() => searchUnsplash(
+                  editArt.title,
+                  (url) => setEditArt(a => ({ ...a, image_url: url })),
+                  (url) => setEditArt(a => ({ ...a, image_url: url }))
+                )}
+                disabled={imgLoading}
+                style={{ ...S.btnO, whiteSpace: 'nowrap' }}
+              >
+                {imgLoading ? '⏳' : '🔍 Unsplash'}
+              </button>
+            </div>
+            {editArt.image_url && (
+              <div style={{ marginBottom: 12, position: 'relative' }}>
+                <img src={editArt.image_url} alt="preview" style={{ width: '100%', maxHeight: 160, objectFit: 'cover', borderRadius: 8 }} />
+                <button onClick={() => setEditArt(a => ({ ...a, image_url: '' }))} style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,.5)', color: '#fff', border: 'none', borderRadius: 4, padding: '3px 8px', fontSize: 12, cursor: 'pointer' }}>✕</button>
+              </div>
+            )}
+            {/* ──────────────────────────────────── */}
+
             <label style={S.lbl}>Contenu</label>
             <textarea value={editArt.content} onChange={e => setEditArt({ ...editArt, content: e.target.value })} style={{ ...S.inp, minHeight: 200, resize: 'vertical' }} />
             <div style={{ display: 'flex', gap: 8 }}>
