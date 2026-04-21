@@ -101,7 +101,8 @@ export default function Admin() {
     setAiStatus('Rédaction en cours...');
     const r = await fetch('/api/ai-write', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: eTitle, cat: eCat }) });
     const d = await r.json();
-    setEContent(d.content || '');
+   if (d.content) setEContent(d.content);
+else showToast('Erreur : ' + (d.error || 'contenu vide'));
     setAiStatus('');
     showToast('✓ Article rédigé !');
   };
