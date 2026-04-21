@@ -1,5 +1,5 @@
 'use client';
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import Link from 'next/link';
 
 const CATS = ['Technologie','Économie','Politique','Agriculture','Culture','Sport','Santé','Éducation','Environnement','Diaspora'];
@@ -16,6 +16,7 @@ export default function Admin() {
   const [eCat, setECat] = useState('Technologie');
   const [eSource, setESource] = useState('');
   const [eContent, setEContent] = useState('');
+  const [contentKey, setContentKey] = useState(0);
   const [aiLoading, setAiLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [genMsg, setGenMsg] = useState('');
@@ -27,19 +28,18 @@ export default function Admin() {
   const [nlMsg, setNlMsg] = useState('');
   const [nlPreview, setNlPreview] = useState('');
   const [toast, setToast] = useState('');
-  const contentRef = useRef(null);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3500); };
 
   const load = useCallback(async (p) => {
     const arts = await fetch('/api/articles').then(r => r.json()).catch(() => []);
-    const subs = await fetch(`/api/subscribers?key=${p}`).then(r => r.json()).catch(() => []);
+    const subs = await fetch('/api/subscribers?key=' + p).then(r => r.json()).catch(() => []);
     setArticles(Array.isArray(arts) ? arts : []);
     setSubscribers(Array.isArray(subs) ? subs : []);
   }, []);
 
   const checkPw = async () => {
-    const res = await fetch(`/api/subscribers?key=${pw}`);
+    const res = await fetch('/api/subscribers?key=' + pw);
     if (res.status === 401) { setPwErr('Mot de passe incorrect'); return; }
     setAdminPw(pw);
     setAuthed(true);
@@ -56,7 +56,7 @@ export default function Admin() {
     });
     const d = await r.json();
     if (d.success) {
-      setGenMsg('✓ ' + d.count + ' articles générés sur "' + d.theme + '"');
+      setGenMsg('✓ ' + d.count + ' articles sur "' + d.theme + '"');
       load(adminPw);
       setTab('pending');
       showToast('✓ ' + d.count + ' articles à valider !');
@@ -67,7 +67,7 @@ export default function Admin() {
   const publish = async (id) => {
     await fetch('/api/articles', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'published' }) });
     load(adminPw);
-    showToast('✓ Article publié sur le site !');
+    showToast('✓ Article publié !');
   };
 
   const reject = async (id) => {
@@ -92,14 +92,13 @@ export default function Admin() {
   const saveManual = async (status) => {
     if (!eTitle.trim() || !eContent.trim()) { showToast('Titre et contenu requis'); return; }
     await fetch('/api/articles', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: eTitle, cat: eCat, source: eSource || 'A-FRIC Rédaction', content: eContent, status }) });
-    setETitle(''); setECat('Technologie'); setESource(''); setEContent('');
-    if (contentRef.current) contentRef.current.value = '';
+    setETitle(''); setECat('Technologie'); setESource(''); setEContent(''); setContentKey(k => k + 1);
     load(adminPw);
     showToast(status === 'published' ? '✓ Publié !' : '✓ Brouillon enregistré');
   };
 
   const aiWrite = async () => {
-    if (!eTitle.trim()) { showToast('Entrez un titre d\'abord'); return; }
+    if (!eTitle.trim()) { showToast('Entrez un titre'); return; }
     setAiLoading(true);
     try {
       const r = await fetch('/api/ai-write', {
@@ -110,12 +109,10 @@ export default function Admin() {
       const d = await r.json();
       if (d.content && d.content.length > 0) {
         setEContent(d.content);
-        if (contentRef.current) {
-          contentRef.current.value = d.content;
-        }
-        showToast('✓ Article rédigé (' + d.content.length + ' caractères)');
+        setContentKey(k => k + 1);
+        showToast('✓ ' + d.content.length + ' caractères générés !');
       } else {
-        showToast('Erreur : ' + (d.error || 'réponse vide'));
+        showToast('Erreur : ' + (d.error || 'contenu vide'));
       }
     } catch (err) {
       showToast('Erreur : ' + err.message);
@@ -192,8 +189,8 @@ export default function Admin() {
             ) : pending.map(a => (
               <div key={a.id} style={{ background: '#fff', border: '1px solid #eee', borderRadius: 10, padding: '1.25rem', marginBottom: 10 }}>
                 <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.5, color: '#1a6b3a', fontWeight: 700, marginBottom: 4 }}>{a.cat}</div>
-                <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>{a.title}</div>
-                <div style={{ fontSize: 12, color: '#aaa', marginBottom: 10 }}>{a.source} · {fmtDate(a.created_at)} {a.type === 'auto' ? '· 🤖 Auto' : '· ✏️ Manuel'}</div>
+                <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6, color: '#111' }}>{a.title}</div>
+                <div style={{ fontSize: 12, color: '#aaa', marginBottom: 10 }}>{a.source} · {fmtDate(a.created_at)} {a.type === 'auto' ? '· 🤖' : '· ✏️'}</div>
                 <div style={{ fontSize: 13, color: '#666', lineHeight: 1.6 }}>{a.content.substring(0, 200)}...</div>
                 <div style={{ display: 'flex', gap: 8, marginTop: 12, paddingTop: 12, borderTop: '1px solid #f5f5f3' }}>
                   <button onClick={() => publish(a.id)} style={{ ...S.btnG, fontSize: 13 }}>✓ Publier sur le site</button>
@@ -211,7 +208,7 @@ export default function Admin() {
             {published.map(a => (
               <div key={a.id} style={{ background: '#fff', border: '1px solid #eee', borderRadius: 10, padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 3 }}>{a.title}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 3, color: '#111' }}>{a.title}</div>
                   <div style={{ fontSize: 12, color: '#aaa' }}>{a.cat} · {a.source} · {fmtDate(a.created_at)}</div>
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
@@ -226,8 +223,8 @@ export default function Admin() {
 
         {tab === 'auto' && (
           <div style={{ background: '#fff', borderRadius: 12, padding: '1.5rem', border: '1px solid #eee' }}>
-            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>Génération automatique</div>
-            <div style={{ fontSize: 14, color: '#888', marginBottom: 20 }}>Groq génère 3 articles. Ils arrivent en brouillon pour ta validation.</div>
+            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6, color: '#111' }}>Génération automatique</div>
+            <div style={{ fontSize: 14, color: '#888', marginBottom: 20 }}>Groq génère 3 articles pro-Afrique. Ils arrivent en brouillon pour validation.</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 8, marginBottom: 16 }}>
               {themes.map((t, i) => (
                 <button key={i} onClick={() => autoGenerate(i)} disabled={generating}
@@ -237,7 +234,7 @@ export default function Admin() {
               ))}
             </div>
             <button onClick={() => autoGenerate()} disabled={generating} style={{ ...S.btnG, padding: '12px 24px', fontSize: 14 }}>
-              {generating ? 'Génération...' : '🎲 Thème aléatoire → 3 articles'}
+              {generating ? '⏳ Génération...' : '🎲 Thème aléatoire → 3 articles'}
             </button>
             {genMsg && <div style={{ marginTop: 16, padding: '12px 16px', background: '#f0faf4', borderRadius: 8, fontSize: 14, color: '#1a6b3a' }}>{genMsg}</div>}
           </div>
@@ -251,20 +248,21 @@ export default function Admin() {
               <div><label style={S.lbl}>Catégorie</label><select value={eCat} onChange={e => setECat(e.target.value)} style={S.inp}>{CATS.map(c => <option key={c}>{c}</option>)}</select></div>
               <div><label style={S.lbl}>Source</label><input value={eSource} onChange={e => setESource(e.target.value)} placeholder="RFI Afrique..." style={S.inp} /></div>
             </div>
-            <label style={S.lbl}>Contenu *</label>
+            <label style={S.lbl}>Contenu * {eContent.length > 0 && <span style={{ color: '#1a6b3a' }}>({eContent.length} caractères)</span>}</label>
             <textarea
-              ref={contentRef}
+              key={contentKey}
+              defaultValue={eContent}
               onChange={e => setEContent(e.target.value)}
               placeholder="Rédigez ici ou cliquez sur ✦ Aide IA..."
-              style={{ ...S.inp, minHeight: 220, resize: 'vertical', color: '#111', background: '#fff' }}
+              style={{ width: '100%', padding: '9px 12px', border: '1px solid #eee', borderRadius: 7, fontSize: 14, marginBottom: 12, fontFamily: 'inherit', boxSizing: 'border-box', outline: 'none', color: '#111', background: '#fff', minHeight: 220, resize: 'vertical' }}
             />
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button onClick={() => saveManual('published')} style={S.btnG}>Publier</button>
               <button onClick={() => saveManual('draft')} style={S.btnO}>Brouillon</button>
-              <button onClick={aiWrite} disabled={aiLoading} style={{ ...S.btnO, background: aiLoading ? '#999' : '#2a1a6b', color: '#fff', borderColor: '#2a1a6b' }}>
+              <button onClick={aiWrite} disabled={aiLoading} style={{ ...S.btnO, background: aiLoading ? '#999' : '#2a1a6b', color: '#fff', borderColor: '#2a1a6b', cursor: aiLoading ? 'wait' : 'pointer' }}>
                 {aiLoading ? '⏳ Génération...' : '✦ Aide IA'}
               </button>
-              <button onClick={() => { setETitle(''); setEContent(''); setESource(''); if (contentRef.current) contentRef.current.value = ''; }} style={S.btnO}>Effacer</button>
+              <button onClick={() => { setETitle(''); setEContent(''); setESource(''); setContentKey(k => k + 1); }} style={S.btnO}>Effacer</button>
             </div>
           </div>
         )}
@@ -272,11 +270,11 @@ export default function Admin() {
         {tab === 'newsletter' && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
             <div style={{ background: '#fff', borderRadius: 12, padding: '1.5rem', border: '1px solid #eee' }}>
-              <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>Créer une newsletter</div>
+              <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16, color: '#111' }}>Créer une newsletter</div>
               <label style={S.lbl}>Sujet</label>
               <input value={nlSubject} onChange={e => setNlSubject(e.target.value)} placeholder="A-FRIC · L'Afrique cette semaine" style={S.inp} />
               <label style={S.lbl}>Introduction</label>
-              <textarea value={nlIntro} onChange={e => setNlIntro(e.target.value)} placeholder="Bonjour..." style={{ ...S.inp, minHeight: 80, color: '#111' }} />
+              <textarea value={nlIntro} onChange={e => setNlIntro(e.target.value)} placeholder="Bonjour..." style={{ ...S.inp, minHeight: 80 }} />
               <label style={S.lbl}>Articles ({nlSelected.length} sélectionnés)</label>
               <div style={{ maxHeight: 240, overflowY: 'auto', border: '1px solid #eee', borderRadius: 8, marginBottom: 12 }}>
                 {published.length === 0 && <div style={{ padding: 16, color: '#aaa', fontSize: 13 }}>Publiez d'abord des articles.</div>}
@@ -291,7 +289,7 @@ export default function Admin() {
               {nlMsg && <div style={{ fontSize: 13, color: '#1a6b3a', marginTop: 10, padding: '8px 12px', background: '#f0faf4', borderRadius: 6 }}>{nlMsg}</div>}
             </div>
             <div style={{ background: '#fff', borderRadius: 12, padding: '1.5rem', border: '1px solid #eee' }}>
-              <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>Abonnés ({subscribers.length})</div>
+              <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: '#111' }}>Abonnés ({subscribers.length})</div>
               {subscribers.length === 0 ? <div style={{ color: '#aaa', fontSize: 13 }}>Aucun abonné.</div> : (
                 <div style={{ maxHeight: 300, overflowY: 'auto' }}>
                   {subscribers.map(s => (
@@ -305,7 +303,7 @@ export default function Admin() {
             </div>
             {nlPreview && (
               <div style={{ gridColumn: '1/-1', background: '#fff', borderRadius: 12, padding: '1.5rem', border: '1px solid #eee' }}>
-                <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>Aperçu</div>
+                <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: '#111' }}>Aperçu</div>
                 <iframe srcDoc={nlPreview} style={{ width: '100%', height: 600, border: '1px solid #eee', borderRadius: 8 }} title="Aperçu" />
               </div>
             )}
@@ -316,14 +314,14 @@ export default function Admin() {
       {editArt && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 200, padding: '2rem', overflowY: 'auto' }}>
           <div style={{ background: '#fff', borderRadius: 14, padding: '2rem', width: '100%', maxWidth: 660 }}>
-            <div style={{ fontSize: 17, fontWeight: 600, marginBottom: 20 }}>Modifier l'article</div>
+            <div style={{ fontSize: 17, fontWeight: 600, marginBottom: 20, color: '#111' }}>Modifier l'article</div>
             <label style={S.lbl}>Titre</label><input value={editArt.title} onChange={e => setEditArt({ ...editArt, title: e.target.value })} style={S.inp} />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div><label style={S.lbl}>Catégorie</label><select value={editArt.cat} onChange={e => setEditArt({ ...editArt, cat: e.target.value })} style={S.inp}>{CATS.map(c => <option key={c}>{c}</option>)}</select></div>
               <div><label style={S.lbl}>Source</label><input value={editArt.source} onChange={e => setEditArt({ ...editArt, source: e.target.value })} style={S.inp} /></div>
             </div>
             <label style={S.lbl}>Contenu</label>
-            <textarea value={editArt.content} onChange={e => setEditArt({ ...editArt, content: e.target.value })} style={{ ...S.inp, minHeight: 200, resize: 'vertical', color: '#111' }} />
+            <textarea value={editArt.content} onChange={e => setEditArt({ ...editArt, content: e.target.value })} style={{ ...S.inp, minHeight: 200, resize: 'vertical' }} />
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => saveEdit('published')} style={S.btnG}>Publier</button>
               <button onClick={() => saveEdit('draft')} style={S.btnO}>Brouillon</button>
