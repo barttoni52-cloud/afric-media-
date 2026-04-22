@@ -234,6 +234,9 @@ export default function Admin() {
         <input type="password" value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === 'Enter' && checkPw()} placeholder="••••••••" style={{ ...S.inp, marginBottom: 12 }} />
         <button onClick={checkPw} style={{ ...S.btnG, width: '100%', padding: 12, fontSize: 14 }}>Connexion</button>
         {pwErr && <div style={{ fontSize: 12, color: '#b02a2a', marginTop: 8, textAlign: 'center' }}>{pwErr}</div>}
+          <button onClick={resetPassword} style={{ background: 'none', border: 'none', color: '#aaa', fontSize: 12, cursor: 'pointer', marginTop: 8, width: '100%' }}>
+  Mot de passe oublié ?
+</button>
         <Link href="/" style={{ display: 'block', textAlign: 'center', marginTop: 16, fontSize: 12, color: '#aaa', textDecoration: 'none' }}>← Retour au site</Link>
       </div>
     </div>
