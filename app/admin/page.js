@@ -1,5 +1,5 @@
 'use client';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 
 const CATS = ['Technologie','Économie','Politique','Agriculture','Culture','Sport','Santé','Éducation','Environnement','Diaspora'];
@@ -16,9 +16,10 @@ export default function Admin() {
   const [eCat, setECat] = useState('Technologie');
   const [eSource, setESource] = useState('');
   const [eContent, setEContent] = useState('');
-  const [eImageUrl, setEImageUrl] = useState('');         // ← NOUVEAU
-  const [eImagePreview, setEImagePreview] = useState(''); // ← NOUVEAU
-  const [imgLoading, setImgLoading] = useState(false);    // ← NOUVEAU
+  const [eImageUrl, setEImageUrl] = useState('');
+  const [eImagePreview, setEImagePreview] = useState('');
+  const [imgLoading, setImgLoading] = useState(false);
+  const [uploadLoading, setUploadLoading] = useState(false);
   const [contentKey, setContentKey] = useState(0);
   const [aiLoading, setAiLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -31,6 +32,8 @@ export default function Admin() {
   const [nlMsg, setNlMsg] = useState('');
   const [nlPreview, setNlPreview] = useState('');
   const [toast, setToast] = useState('');
+  const fileInputRef = useRef(null);
+  const editFileInputRef = useRef(null);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3500); };
 
@@ -63,7 +66,7 @@ export default function Admin() {
       load(adminPw);
       setTab('pending');
       showToast('✓ ' + d.count + ' articles à valider !');
-    } else setGenMsg('Erreur : ' + d.error);
+    } else setGenMsg('Erreur : ' + (d.error || 'inconnue'));
     setGenerating(false);
   };
 
@@ -92,8 +95,8 @@ export default function Admin() {
     showToast('Supprimé');
   };
 
-  // ── NOUVEAU : recherche image Unsplash ──────────────────────────────────────
-const searchUnsplash = async (title, setUrl, setPreview) => {
+  // ── Recherche Unsplash via API serveur ─────────────────────────────────────
+  const searchUnsplash = async (title, setUrl, setPreview) => {
     if (!title.trim()) { showToast('Entrez un titre d\'abord'); return; }
     setImgLoading(true);
     try {
@@ -102,27 +105,39 @@ const searchUnsplash = async (title, setUrl, setPreview) => {
       const data = await res.json();
       const url = data?.url;
       if (url) { setUrl(url); setPreview(url); showToast('✓ Image trouvée !'); }
-      else showToast('Aucune image trouvée, essayez une URL manuelle');
+      else showToast('Aucune image trouvée, essayez une URL ou téléchargez une photo');
     } catch { showToast('Erreur lors de la recherche Unsplash'); }
     setImgLoading(false);
   };
-  // ────────────────────────────────────────────────────────────────────────────
+
+  // ── Upload image depuis téléphone/ordinateur ───────────────────────────────
+  const uploadImage = async (file, setUrl, setPreview) => {
+    if (!file) return;
+    setUploadLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (data.url) {
+        setUrl(data.url);
+        setPreview(data.url);
+        showToast('✓ Image uploadée !');
+      } else {
+        showToast('Erreur upload : ' + (data.error || 'inconnue'));
+      }
+    } catch { showToast('Erreur lors de l\'upload'); }
+    setUploadLoading(false);
+  };
 
   const saveManual = async (status) => {
     if (!eTitle.trim() || !eContent.trim()) { showToast('Titre et contenu requis'); return; }
     await fetch('/api/articles', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: eTitle, cat: eCat,
-        source: eSource || 'A-FRIC Rédaction',
-        content: eContent,
-        image_url: eImageUrl || null, // ← NOUVEAU
-        status
-      })
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: eTitle, cat: eCat, source: eSource || 'A-FRIC Rédaction', content: eContent, image_url: eImageUrl || null, status })
     });
     setETitle(''); setECat('Technologie'); setESource('');
-    setEContent(''); setEImageUrl(''); setEImagePreview(''); // ← NOUVEAU
+    setEContent(''); setEImageUrl(''); setEImagePreview('');
     setContentKey(k => k + 1);
     load(adminPw);
     showToast(status === 'published' ? '✓ Publié !' : '✓ Brouillon enregistré');
@@ -133,8 +148,7 @@ const searchUnsplash = async (title, setUrl, setPreview) => {
     setAiLoading(true);
     try {
       const r = await fetch('/api/ai-write', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: eTitle, cat: eCat })
       });
       const d = await r.json();
@@ -142,21 +156,13 @@ const searchUnsplash = async (title, setUrl, setPreview) => {
         setEContent(d.content);
         setContentKey(k => k + 1);
         showToast('✓ ' + d.content.length + ' caractères générés !');
-      } else {
-        showToast('Erreur : ' + (d.error || 'contenu vide'));
-      }
-    } catch (err) {
-      showToast('Erreur : ' + err.message);
-    }
+      } else showToast('Erreur : ' + (d.error || 'contenu vide'));
+    } catch (err) { showToast('Erreur : ' + err.message); }
     setAiLoading(false);
   };
 
   const saveEdit = async (status) => {
-    await fetch('/api/articles', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...editArt, status }) // image_url déjà dans editArt
-    });
+    await fetch('/api/articles', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...editArt, status }) });
     setEditArt(null);
     load(adminPw);
     showToast('✓ Mis à jour !');
@@ -170,6 +176,45 @@ const searchUnsplash = async (title, setUrl, setPreview) => {
     if (d.success) { setNlMsg('✓ Newsletter générée !'); setNlPreview(d.newsletter?.html_content || ''); }
     else setNlMsg('Erreur : ' + d.error);
   };
+
+  // ── Bloc image réutilisable ─────────────────────────────────────────────────
+  const ImageBlock = ({ imageUrl, setUrl, imagePreview, setPreview, title, fileRef }) => (
+    <div style={{ marginBottom: 16 }}>
+      <label style={S.lbl}>Image de l'article</label>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+        <input
+          value={imageUrl}
+          onChange={e => { setUrl(e.target.value); setPreview(e.target.value); }}
+          placeholder="Coller une URL d'image..."
+          style={{ ...S.inp, marginBottom: 0, flex: 1, minWidth: 160 }}
+        />
+        <button type="button" onClick={() => searchUnsplash(title, setUrl, setPreview)}
+          disabled={imgLoading}
+          style={{ ...S.btnO, whiteSpace: 'nowrap' }}>
+          {imgLoading ? '⏳' : '🔍 Unsplash'}
+        </button>
+        <button type="button" onClick={() => fileRef.current?.click()}
+          disabled={uploadLoading}
+          style={{ ...S.btnO, whiteSpace: 'nowrap', background: '#fff' }}>
+          {uploadLoading ? '⏳' : '📱 Télécharger'}
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={e => e.target.files?.[0] && uploadImage(e.target.files[0], setUrl, setPreview)}
+        />
+      </div>
+      {imagePreview && (
+        <div style={{ position: 'relative' }}>
+          <img src={imagePreview} alt="preview" style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 8 }} />
+          <button onClick={() => { setUrl(''); setPreview(''); }}
+            style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,.5)', color: '#fff', border: 'none', borderRadius: 4, padding: '3px 8px', fontSize: 12, cursor: 'pointer' }}>✕</button>
+        </div>
+      )}
+    </div>
+  );
 
   const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
   const pending = articles.filter(a => a.status === 'draft');
@@ -207,9 +252,9 @@ const searchUnsplash = async (title, setUrl, setPreview) => {
           ))}
         </div>
 
-        <div style={{ display: 'flex', borderBottom: '2px solid #e8e8e4', marginBottom: 20 }}>
+        <div style={{ display: 'flex', borderBottom: '2px solid #e8e8e4', marginBottom: 20, overflowX: 'auto' }}>
           {[['pending','⏳ À valider ('+pending.length+')'],['published','✅ Publiés ('+published.length+')'],['auto','🤖 Générer'],['write','✏️ Rédiger'],['newsletter','📬 Newsletter']].map(([id, label]) => (
-            <button key={id} onClick={() => setTab(id)} style={{ padding: '10px 16px', fontSize: 13, cursor: 'pointer', border: 'none', background: 'transparent', borderBottom: tab === id ? '2px solid #1a6b3a' : '2px solid transparent', marginBottom: -2, color: tab === id ? '#1a6b3a' : '#888', fontWeight: tab === id ? 600 : 400 }}>{label}</button>
+            <button key={id} onClick={() => setTab(id)} style={{ padding: '10px 16px', fontSize: 13, cursor: 'pointer', border: 'none', background: 'transparent', borderBottom: tab === id ? '2px solid #1a6b3a' : '2px solid transparent', marginBottom: -2, color: tab === id ? '#1a6b3a' : '#888', fontWeight: tab === id ? 600 : 400, whiteSpace: 'nowrap' }}>{label}</button>
           ))}
         </div>
 
@@ -223,16 +268,13 @@ const searchUnsplash = async (title, setUrl, setPreview) => {
               </div>
             ) : pending.map(a => (
               <div key={a.id} style={{ background: '#fff', border: '1px solid #eee', borderRadius: 10, padding: '1.25rem', marginBottom: 10 }}>
-                {/* ── NOUVEAU : miniature image si disponible ── */}
-                {a.image_url && (
-                  <img src={a.image_url} alt="" style={{ width: '100%', height: 140, objectFit: 'cover', borderRadius: 7, marginBottom: 10 }} />
-                )}
+                {a.image_url && <img src={a.image_url} alt="" style={{ width: '100%', height: 140, objectFit: 'cover', borderRadius: 7, marginBottom: 10 }} />}
                 <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.5, color: '#1a6b3a', fontWeight: 700, marginBottom: 4 }}>{a.cat}</div>
                 <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6, color: '#111' }}>{a.title}</div>
                 <div style={{ fontSize: 12, color: '#aaa', marginBottom: 10 }}>{a.source} · {fmtDate(a.created_at)} {a.type === 'auto' ? '· 🤖' : '· ✏️'}</div>
                 <div style={{ fontSize: 13, color: '#666', lineHeight: 1.6 }}>{a.content.substring(0, 200)}...</div>
-                <div style={{ display: 'flex', gap: 8, marginTop: 12, paddingTop: 12, borderTop: '1px solid #f5f5f3' }}>
-                  <button onClick={() => publish(a.id)} style={{ ...S.btnG, fontSize: 13 }}>✓ Publier sur le site</button>
+                <div style={{ display: 'flex', gap: 8, marginTop: 12, paddingTop: 12, borderTop: '1px solid #f5f5f3', flexWrap: 'wrap' }}>
+                  <button onClick={() => publish(a.id)} style={{ ...S.btnG, fontSize: 13 }}>✓ Publier</button>
                   <button onClick={() => setEditArt({ ...a })} style={S.btnO}>Modifier</button>
                   <button onClick={() => reject(a.id)} style={{ ...S.btnO, color: '#b02a2a', borderColor: '#f5c5c5' }}>Rejeter</button>
                 </div>
@@ -246,7 +288,6 @@ const searchUnsplash = async (title, setUrl, setPreview) => {
             {published.length === 0 && <div style={{ textAlign: 'center', padding: '3rem', color: '#bbb' }}>Aucun article publié.</div>}
             {published.map(a => (
               <div key={a.id} style={{ background: '#fff', border: '1px solid #eee', borderRadius: 10, padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: 12 }}>
-                {/* ── NOUVEAU : vignette ── */}
                 {a.image_url && <img src={a.image_url} alt="" style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />}
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 3, color: '#111' }}>{a.title}</div>
@@ -265,17 +306,18 @@ const searchUnsplash = async (title, setUrl, setPreview) => {
         {tab === 'auto' && (
           <div style={{ background: '#fff', borderRadius: 12, padding: '1.5rem', border: '1px solid #eee' }}>
             <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6, color: '#111' }}>Génération automatique</div>
-            <div style={{ fontSize: 14, color: '#888', marginBottom: 20 }}>Groq génère 3 articles pro-Afrique. Ils arrivent en brouillon pour validation.</div>
+            <div style={{ fontSize: 14, color: '#888', marginBottom: 20 }}>L'IA génère 3 articles basés sur les vraies actualités africaines. Ils arrivent en brouillon pour validation.</div>
+            {themes.length === 0 && <div style={{ color: '#aaa', fontSize: 13, marginBottom: 16 }}>Chargement des thèmes...</div>}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 8, marginBottom: 16 }}>
               {themes.map((t, i) => (
                 <button key={i} onClick={() => autoGenerate(i)} disabled={generating}
-                  style={{ padding: '10px 14px', borderRadius: 8, border: '1px solid #eee', background: '#fafaf8', fontSize: 13, cursor: 'pointer', textAlign: 'left', color: '#333' }}>
+                  style={{ padding: '10px 14px', borderRadius: 8, border: '1px solid #eee', background: '#fafaf8', fontSize: 13, cursor: generating ? 'wait' : 'pointer', textAlign: 'left', color: '#333', opacity: generating ? .6 : 1 }}>
                   {t}
                 </button>
               ))}
             </div>
             <button onClick={() => autoGenerate()} disabled={generating} style={{ ...S.btnG, padding: '12px 24px', fontSize: 14 }}>
-              {generating ? '⏳ Génération...' : '🎲 Thème aléatoire → 3 articles'}
+              {generating ? '⏳ Génération en cours...' : '🎲 Thème aléatoire → 3 articles'}
             </button>
             {genMsg && <div style={{ marginTop: 16, padding: '12px 16px', background: '#f0faf4', borderRadius: 8, fontSize: 14, color: '#1a6b3a' }}>{genMsg}</div>}
           </div>
@@ -289,41 +331,15 @@ const searchUnsplash = async (title, setUrl, setPreview) => {
               <div><label style={S.lbl}>Catégorie</label><select value={eCat} onChange={e => setECat(e.target.value)} style={S.inp}>{CATS.map(c => <option key={c}>{c}</option>)}</select></div>
               <div><label style={S.lbl}>Source</label><input value={eSource} onChange={e => setESource(e.target.value)} placeholder="RFI Afrique..." style={S.inp} /></div>
             </div>
-
-            {/* ── NOUVEAU : bloc image ──────────────────────────────────────── */}
-            <label style={S.lbl}>Image de l'article</label>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-              <input
-                value={eImageUrl}
-                onChange={e => { setEImageUrl(e.target.value); setEImagePreview(e.target.value); }}
-                placeholder="Coller une URL d'image (optionnel)..."
-                style={{ ...S.inp, marginBottom: 0, flex: 1 }}
-              />
-              <button
-                type="button"
-                onClick={() => searchUnsplash(eTitle, setEImageUrl, setEImagePreview)}
-                disabled={imgLoading}
-                style={{ ...S.btnO, whiteSpace: 'nowrap', background: imgLoading ? '#f5f5f5' : '#fff' }}
-              >
-                {imgLoading ? '⏳' : '🔍 Unsplash'}
-              </button>
-            </div>
-            {eImagePreview && (
-              <div style={{ marginBottom: 16, position: 'relative' }}>
-                <img src={eImagePreview} alt="preview" style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 8 }} />
-                <button onClick={() => { setEImageUrl(''); setEImagePreview(''); }} style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,.5)', color: '#fff', border: 'none', borderRadius: 4, padding: '3px 8px', fontSize: 12, cursor: 'pointer' }}>✕</button>
-              </div>
-            )}
-            {/* ──────────────────────────────────────────────────────────────── */}
-
-            <label style={S.lbl}>Contenu * {eContent.length > 0 && <span style={{ color: '#1a6b3a' }}>({eContent.length} caractères)</span>}</label>
-            <textarea
-              key={contentKey}
-              defaultValue={eContent}
-              onChange={e => setEContent(e.target.value)}
-              placeholder="Rédigez ici ou cliquez sur ✦ Aide IA..."
-              style={{ width: '100%', padding: '9px 12px', border: '1px solid #eee', borderRadius: 7, fontSize: 14, marginBottom: 12, fontFamily: 'inherit', boxSizing: 'border-box', outline: 'none', color: '#111', background: '#fff', minHeight: 220, resize: 'vertical' }}
+            <ImageBlock
+              imageUrl={eImageUrl} setUrl={setEImageUrl}
+              imagePreview={eImagePreview} setPreview={setEImagePreview}
+              title={eTitle} fileRef={fileInputRef}
             />
+            <label style={S.lbl}>Contenu * {eContent.length > 0 && <span style={{ color: '#1a6b3a' }}>({eContent.length} caractères)</span>}</label>
+            <textarea key={contentKey} defaultValue={eContent} onChange={e => setEContent(e.target.value)}
+              placeholder="Rédigez ici ou cliquez sur ✦ Aide IA..."
+              style={{ width: '100%', padding: '9px 12px', border: '1px solid #eee', borderRadius: 7, fontSize: 14, marginBottom: 12, fontFamily: 'inherit', boxSizing: 'border-box', outline: 'none', color: '#111', background: '#fff', minHeight: 220, resize: 'vertical' }} />
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button onClick={() => saveManual('published')} style={S.btnG}>Publier</button>
               <button onClick={() => saveManual('draft')} style={S.btnO}>Brouillon</button>
@@ -379,47 +395,21 @@ const searchUnsplash = async (title, setUrl, setPreview) => {
         )}
       </div>
 
-      {/* ── Modal modifier article ─────────────────────────────────────────── */}
       {editArt && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 200, padding: '2rem', overflowY: 'auto' }}>
           <div style={{ background: '#fff', borderRadius: 14, padding: '2rem', width: '100%', maxWidth: 660 }}>
             <div style={{ fontSize: 17, fontWeight: 600, marginBottom: 20, color: '#111' }}>Modifier l'article</div>
-            <label style={S.lbl}>Titre</label><input value={editArt.title} onChange={e => setEditArt({ ...editArt, title: e.target.value })} style={S.inp} />
+            <label style={S.lbl}>Titre</label>
+            <input value={editArt.title} onChange={e => setEditArt({ ...editArt, title: e.target.value })} style={S.inp} />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div><label style={S.lbl}>Catégorie</label><select value={editArt.cat} onChange={e => setEditArt({ ...editArt, cat: e.target.value })} style={S.inp}>{CATS.map(c => <option key={c}>{c}</option>)}</select></div>
               <div><label style={S.lbl}>Source</label><input value={editArt.source} onChange={e => setEditArt({ ...editArt, source: e.target.value })} style={S.inp} /></div>
             </div>
-
-            {/* ── NOUVEAU : image dans la modal ── */}
-            <label style={S.lbl}>Image de l'article</label>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-              <input
-                value={editArt.image_url || ''}
-                onChange={e => setEditArt({ ...editArt, image_url: e.target.value })}
-                placeholder="URL de l'image..."
-                style={{ ...S.inp, marginBottom: 0, flex: 1 }}
-              />
-              <button
-                type="button"
-                onClick={() => searchUnsplash(
-                  editArt.title,
-                  (url) => setEditArt(a => ({ ...a, image_url: url })),
-                  (url) => setEditArt(a => ({ ...a, image_url: url }))
-                )}
-                disabled={imgLoading}
-                style={{ ...S.btnO, whiteSpace: 'nowrap' }}
-              >
-                {imgLoading ? '⏳' : '🔍 Unsplash'}
-              </button>
-            </div>
-            {editArt.image_url && (
-              <div style={{ marginBottom: 12, position: 'relative' }}>
-                <img src={editArt.image_url} alt="preview" style={{ width: '100%', maxHeight: 160, objectFit: 'cover', borderRadius: 8 }} />
-                <button onClick={() => setEditArt(a => ({ ...a, image_url: '' }))} style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,.5)', color: '#fff', border: 'none', borderRadius: 4, padding: '3px 8px', fontSize: 12, cursor: 'pointer' }}>✕</button>
-              </div>
-            )}
-            {/* ──────────────────────────────────── */}
-
+            <ImageBlock
+              imageUrl={editArt.image_url || ''} setUrl={(url) => setEditArt(a => ({ ...a, image_url: url }))}
+              imagePreview={editArt.image_url || ''} setPreview={(url) => setEditArt(a => ({ ...a, image_url: url }))}
+              title={editArt.title} fileRef={editFileInputRef}
+            />
             <label style={S.lbl}>Contenu</label>
             <textarea value={editArt.content} onChange={e => setEditArt({ ...editArt, content: e.target.value })} style={{ ...S.inp, minHeight: 200, resize: 'vertical' }} />
             <div style={{ display: 'flex', gap: 8 }}>
