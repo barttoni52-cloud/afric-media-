@@ -93,17 +93,14 @@ export default function Admin() {
   };
 
   // ── NOUVEAU : recherche image Unsplash ──────────────────────────────────────
-  const searchUnsplash = async (title, setUrl, setPreview) => {
+const searchUnsplash = async (title, setUrl, setPreview) => {
     if (!title.trim()) { showToast('Entrez un titre d\'abord'); return; }
     setImgLoading(true);
     try {
       const query = encodeURIComponent(title + ' Africa');
-      const res = await fetch(
-        `https://api.unsplash.com/search/photos?query=${query}&per_page=1&orientation=landscape`,
-        { headers: { Authorization: `Client-ID ${process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY}` } }
-      );
+      const res = await fetch(`/api/unsplash?query=${query}`);
       const data = await res.json();
-      const url = data?.results?.[0]?.urls?.regular;
+      const url = data?.url;
       if (url) { setUrl(url); setPreview(url); showToast('✓ Image trouvée !'); }
       else showToast('Aucune image trouvée, essayez une URL manuelle');
     } catch { showToast('Erreur lors de la recherche Unsplash'); }
