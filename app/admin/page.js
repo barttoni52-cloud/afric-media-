@@ -44,18 +44,13 @@ export default function Admin() {
     setSubscribers(Array.isArray(subs) ? subs : []);
   }, []);
 
- const checkPw = async () => {
+  const checkPw = async () => {
     const res = await fetch('/api/subscribers?key=' + pw);
     if (res.status === 401) { setPwErr('Mot de passe incorrect'); return; }
     setAdminPw(pw);
     setAuthed(true);
     load(pw);
     fetch('/api/auto-generate').then(r => r.json()).then(d => setThemes(d.themes || []));
-  };
-
-  const resetPassword = () => {
-    window.location.href = 'mailto:barttoni52@gmail.com?subject=A-FRIC%20Admin%20-%20Récupération%20mot%20de%20passe&body=Bonjour,%0A%0AJe%20souhaite%20réinitialiser%20mon%20mot%20de%20passe%20admin%20A-FRIC.%0A%0AMon%20mot%20de%20passe%20actuel%20dans%20Vercel%20est%20dans%20Settings%20→%20Environment%20Variables%20→%20NEXT_PUBLIC_ADMIN_PASSWORD';
-  };
   };
 
   const autoGenerate = async (themeIndex) => {
@@ -234,9 +229,6 @@ export default function Admin() {
         <input type="password" value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === 'Enter' && checkPw()} placeholder="••••••••" style={{ ...S.inp, marginBottom: 12 }} />
         <button onClick={checkPw} style={{ ...S.btnG, width: '100%', padding: 12, fontSize: 14 }}>Connexion</button>
         {pwErr && <div style={{ fontSize: 12, color: '#b02a2a', marginTop: 8, textAlign: 'center' }}>{pwErr}</div>}
-          <button onClick={resetPassword} style={{ background: 'none', border: 'none', color: '#aaa', fontSize: 12, cursor: 'pointer', marginTop: 8, width: '100%' }}>
-  Mot de passe oublié ?
-</button>
         <Link href="/" style={{ display: 'block', textAlign: 'center', marginTop: 16, fontSize: 12, color: '#aaa', textDecoration: 'none' }}>← Retour au site</Link>
       </div>
     </div>
