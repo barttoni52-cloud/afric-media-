@@ -1,4 +1,12 @@
 {
+  "functions": {
+    "app/api/auto-generate/route.js": {
+      "maxDuration": 60
+    },
+    "app/api/cron/route.js": {
+      "maxDuration": 60
+    }
+  },
   "crons": [
     {
       "path": "/api/cron",
